@@ -1,0 +1,15 @@
+.venv/
+node_modules/
+frontend/dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+data/
+*.sqlite*
+*.db*
+.runtime/
+.impeccable/review/
+.impeccable/mocks/
+.env
+.env.*
+!.env.example
