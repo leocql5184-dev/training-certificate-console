@@ -2,6 +2,15 @@
 
 日期：2026-11-26。环境：Windows，本地 Python 3.12、Node.js 24；依赖固定于 requirements.lock.txt 和 frontend/package-lock.json。
 
+## 学员目录与界面回归
+
+运行 `python run.py --verify --benchmark`，41 项测试通过（24.49 秒），1 条 TestClient 弃用提示。两条新增浏览器用例在真实 FastAPI 服务和隔离 SQLite 数据库上操作构建后的 React 页面：
+
+- East 有 100,006 名学员时，目录首个响应仅含 20 人；可翻到第 2 页再搜索 Alex Lee。展开前浏览器没有请求选课，展开后唯一的选课请求按 East 学员 ID 返回 3 条。切换到 Bob 后显示 West 同名学员，使用 Bob 请求该 East ID 返回空数组。
+- 签发提交期间按钮禁用。在服务端提交成功后模拟响应丢失，页面重试沿用同一幂等键。取消撤销时浏览器发出 0 次撤销请求，确认时发出 1 次并显示已撤销。证书列表收到模拟的 503 后，可点击重新加载恢复列表。
+
+A6 同轮两次导出分别用时 0.719 和 0.438 秒；读到第 50,000 行终止服务后，重启并重新导出用时 0.968 秒。三次完整下载均为 100,000 行，摘要相同。
+
 ## 评委复现记录
 
 从本地 Git 仓库克隆独立副本，叠加本次两份测试文件，使用副本新建的虚拟环境和前端依赖运行 `python run.py --verify --benchmark`。安装使用了本机可用的包缓存。TypeScript 与 Vite 构建成功，pytest **39 passed，3.66 秒**，另有一条 Starlette TestClient 弃用提示。完整命令退出码为 0。独立副本随后使用 `python run.py --port <空闲端口>` 启动，首页包含 React 挂载节点，健康接口返回 ok，两位管理员首次查询各有 7 张证书。

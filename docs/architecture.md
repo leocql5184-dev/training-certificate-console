@@ -18,6 +18,8 @@ All protected endpoints use `X-Actor-Id` header (`alice`, `bob` demo IDs). Actor
 - GET /api/overview -> {learners:int,courses:int,enrollments:int,completed:int,eligible:int,active_certificates:int,revoked_certificates:int}
 - GET /api/courses -> [{id,title,description,enrolled_count,completed_count,eligible_count,certificate_count}]
 - GET /api/learners?q= -> [{id,name,email,enrolled_count,completed_count,certificate_count}]
+- GET /api/learners?page=1&page_size=20&q= -> {items,total,page,page_size}. Page size 1–100. Select learners by name and ID before aggregating enrollment counts for the page.
+- GET /api/enrollments?learner_id=... returns only that learner's records within the actor's tenant. The directory requests this on expansion. Course and search filters can be combined.
 - GET /api/enrollments?course_id=&q= -> [{id,learner_id,learner_name,learner_email,course_id,course_title,status:"completed"|"in_progress"|"not_started",student_status:"incomplete"|"completed"|"certified",progress:int,completed_at:string|null,certificate_id:string|null,certificate_status:string|null}]
 - GET /api/certificates?q=&sort=issued_date&direction=desc&page=1&page_size=10&status=&course_id= -> {items:[Certificate],total,page,page_size}. sort enum: learner_name, course_title, serial_number, issued_date; status active/revoked. Append ID tie-breaker consistently to list/export.
 - Certificate: {id,serial_number,learner_id,learner_name,course_id,course_title,issued_at,issued_local,issued_date,status:"active"|"revoked",revoked_at:string|null}. issued_local is YYYY-MM-DD HH:mm. issued_date is YYYY-MM-DD.

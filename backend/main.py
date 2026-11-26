@@ -154,26 +154,44 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
             db.close()
 
     @application.get("/api/learners")
-    def learners(q: str = Query("", max_length=200), actor: dict = Depends(get_actor)):
+    def learners(q: str = Query("", max_length=200), page: int | None = Query(None, ge=1),
+                 page_size: int = Query(20, ge=1, le=100), actor: dict = Depends(get_actor)):
         db = connect(path)
         try:
-            return [dict(row) for row in db.execute("""SELECT l.id,l.name,l.email,
-                COUNT(e.id) AS enrolled_count,
-                SUM(CASE WHEN e.status='completed' THEN 1 ELSE 0 END) AS completed_count,
-                COUNT(c.id) AS certificate_count
-                FROM learners l LEFT JOIN enrollments e ON e.tenant_id=l.tenant_id AND e.learner_id=l.id
+            db.execute("BEGIN")
+            where = "tenant_id=?"
+            args = [actor["tenant_id"]]
+            if q.strip():
+                where += " AND (name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\')"
+                args.extend([like_pattern(q), like_pattern(q)])
+            selected = "SELECT id,tenant_id,name,email FROM learners WHERE " + where + " ORDER BY name,id"
+            if page is not None:
+                total = db.execute("SELECT COUNT(*) FROM learners WHERE " + where, args).fetchone()[0]
+                selected += " LIMIT ? OFFSET ?"
+                args.extend([page_size, (page - 1) * page_size])
+            rows = db.execute(f"""WITH selected AS ({selected})
+                SELECT l.id,l.name,l.email,COUNT(e.id) AS enrolled_count,
+                       COUNT(CASE WHEN e.status='completed' THEN 1 END) AS completed_count,
+                       COUNT(c.id) AS certificate_count
+                FROM selected l LEFT JOIN enrollments e ON e.tenant_id=l.tenant_id AND e.learner_id=l.id
                 LEFT JOIN certificates c ON c.tenant_id=e.tenant_id AND c.enrollment_id=e.id
-                WHERE l.tenant_id=? AND (l.name LIKE ? ESCAPE '\\' OR l.email LIKE ? ESCAPE '\\')
-                GROUP BY l.id ORDER BY l.name,l.id""", (actor["tenant_id"], like_pattern(q), like_pattern(q)))]
+                GROUP BY l.id ORDER BY l.name,l.id""", args)
+            items = [dict(row) for row in rows]
+            if page is None:
+                return items
+            return {"items": items, "total": total, "page": page, "page_size": page_size}
         finally:
             db.close()
 
     @application.get("/api/enrollments")
-    def enrollments(course_id: str = Query("", max_length=200), q: str = Query("", max_length=200), actor: dict = Depends(get_actor)):
+    def enrollments(learner_id: str = Query("", max_length=200), course_id: str = Query("", max_length=200), q: str = Query("", max_length=200), actor: dict = Depends(get_actor)):
         db = connect(path)
         try:
             args = [actor["tenant_id"], like_pattern(q), like_pattern(q)]
             where = "WHERE e.tenant_id=? AND (l.name LIKE ? ESCAPE '\\' OR co.title LIKE ? ESCAPE '\\')"
+            if learner_id:
+                where += " AND e.learner_id=?"
+                args.append(learner_id)
             if course_id:
                 where += " AND e.course_id=?"
                 args.append(course_id)

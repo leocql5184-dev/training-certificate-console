@@ -35,11 +35,15 @@ python run.py
 
 ## 验证
 
-构建前端并运行隔离数据库上的验收测试：
+构建前端并运行 API 与真实浏览器验收测试：
 
 ```powershell
 python run.py --verify
 ```
+
+浏览器测试使用 Playwright Core 驱动无头浏览器。测试会优先使用 Playwright 已安装的 Chromium，其次在 Windows 上使用 Edge，在其他系统上使用 Chrome。也可以将环境变量 `BROWSER_EXECUTABLE` 设为 Chromium 兼容浏览器的完整可执行文件路径。需要安装测试浏览器时，在 `python run.py --prepare` 后进入 `frontend` 目录执行 `npx playwright-core install chromium`。
+
+只检查本轮界面回归时，在仓库根目录运行 `.\.venv\Scripts\python.exe -m pytest -v tests/test_browser.py`（先运行 `python run.py --prepare`）。测试在临时库中生成 100,000 名东部学员，检查分页、按需展开课程和租户切换；另一个用例覆盖签发中禁止重复提交、响应丢失后用原键重试、撤销确认与取消、证书列表加载失败后重试。
 
 运行完整验收及真实 HTTP 十万行导出基准：
 
@@ -120,8 +124,7 @@ python run.py --port 8010
 
 ### 已知问题与验证边界
 
-- 学员目录会一次取回本租户的学员及选课记录，再由浏览器筛选选课。十万行基准覆盖证书列表与导出；学员目录的大数据量响应和渲染耗时未设上限。
-- 自动化验证覆盖 HTTP、数据库和构建产物。按钮禁用、确认对话框和错误重试等浏览器交互仍依赖人工回归；以前的浏览器检查见 [验证记录](docs/verification.md)。
+- 学员目录每页请求 20 人，展开时按学员 ID 查询选课。API 为已有调用方保留未传页码时的数组格式。模糊搜索仍需在本租户内匹配姓名或邮箱。
 - 单独移走 `.venv` 并保留 `.runtime/python-dependencies.sha256` 时，启动脚本可能为新环境跳过依赖安装。遇到此情况可在新建的项目虚拟环境运行 `.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt`，再启动。
 
 本仓库是可运行项目。正式提交还需完整 AI 原生会话导出、会话索引、关联 Git 提交的决策日志、工具操作记录和完整性声明；规划与子代理交互也要纳入。不能用代码或本 README 替代原始会话证据。
