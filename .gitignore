@@ -4,6 +4,7 @@ frontend/dist/
 __pycache__/
 .pytest_cache/
 *.pyc
+*.tsbuildinfo
 data/
 *.sqlite*
 *.db*
