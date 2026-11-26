@@ -1,0 +1,9 @@
+session_id,tool,model,started_at,ended_at,export_file,purpose,related_commits
+session-359a48ae97b3,Codex desktop,gpt-6-astra / gpt-6.2-astra,2026-11-26T13:05:39.193Z,2026-11-26T14:14:46.779Z,ai/sessions/session-359a48ae97b3.jsonl,main,711d537 3b2ffbf 2436845 526f81e d408fd2 7318555 1a221f4
+session-8b8b2a97de5e,Codex desktop,gpt-6-astra,2026-11-26T13:08:12.744Z,2026-11-26T13:10:34.386Z,ai/sessions/session-8b8b2a97de5e.jsonl,requirements_review,711d537
+session-d7f79a7b0329,Codex desktop,gpt-6-astra,2026-11-26T13:14:59.348Z,2026-11-26T13:22:37.252Z,ai/sessions/session-d7f79a7b0329.jsonl,backend,3b2ffbf
+session-0725dc8e672d,Codex desktop,gpt-6-astra,2026-11-26T13:15:10.456Z,2026-11-26T13:28:23.670Z,ai/sessions/session-0725dc8e672d.jsonl,frontend,2436845
+session-529eb86c3d9e,Codex desktop,gpt-6-astra,2026-11-26T13:15:20.632Z,2026-11-26T13:35:40.271Z,ai/sessions/session-529eb86c3d9e.jsonl,verification,3b2ffbf 2436845
+session-0f5e5556720d,Codex desktop,gpt-6-astra,2026-11-26T13:22:48.186Z,2026-11-26T13:26:12.117Z,ai/sessions/session-0f5e5556720d.jsonl,integration_review,3b2ffbf 2436845
+session-25b6d94f22bf,Codex desktop,gpt-6-astra,2026-11-26T13:27:57.796Z,2026-11-26T13:31:06.793Z,ai/sessions/session-25b6d94f22bf.jsonl,impeccable_finish_reviewer,2436845
+session-81fe05d210e7,Codex desktop,gpt-6-astra,2026-11-26T13:30:39.271Z,2026-11-26T13:33:43.368Z,ai/sessions/session-81fe05d210e7.jsonl,impeccable_documenter,2436845

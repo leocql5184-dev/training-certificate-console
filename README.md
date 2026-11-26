@@ -127,6 +127,6 @@ python run.py --port 8010
 - 学员目录每页请求 20 人，展开时按学员 ID 查询选课。API 为已有调用方保留未传页码时的数组格式。模糊搜索仍需在本租户内匹配姓名或邮箱。
 - 单独移走 `.venv` 并保留 `.runtime/python-dependencies.sha256` 时，启动脚本可能为新环境跳过依赖安装。遇到此情况可在新建的项目虚拟环境运行 `.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt`，再启动。
 
-本仓库是可运行项目。正式提交还需完整 AI 原生会话导出、会话索引、关联 Git 提交的决策日志、工具操作记录和完整性声明；规划与子代理交互也要纳入。不能用代码或本 README 替代原始会话证据。
+[会话索引](ai/session-index.csv)列出 8 个项目交互会话；[决策日志](ai/decision-log.md)关联会话、验收用例与提交。候选人原文见 [written-answers.md](written-answers.md)。会话导出范围、隐私删节和超过一小时时限的情况见 [完整性声明](ai/completeness.md)。考核原件、截图及原生会话编号对应关系保存在本地完整评审包。
 
-文档第 6 节的 `written-answers.md` 为候选人独立书面回答，本仓库未代写。正式考核的一小时计时及最终提交由候选人按考核安排管理；本地开发结果不等同于已完成提交。
+离线交付包中的 project/ 可直接运行；在解压目录执行 `git clone project.bundle review` 可还原仓库，`git -C review branch -a` 可查看验证前的备份分支。将 `git -C review rev-parse HEAD` 与包中的 FINAL-COMMIT.txt 比对，即可确认检出的版本。
