@@ -1,0 +1,9 @@
+export type Actor = { id: string; name: string; email: string; tenant_id: string; tenant_name: string; timezone: string };
+export type Overview = { learners: number; courses: number; enrollments: number; completed: number; eligible: number; active_certificates: number; revoked_certificates: number };
+export type Course = { id: string; title: string; description: string; enrolled_count: number; completed_count: number; eligible_count: number; certificate_count: number };
+export type Learner = { id: string; name: string; email: string; enrolled_count: number; completed_count: number; certificate_count: number };
+export type Enrollment = { id: string; learner_id: string; learner_name: string; learner_email: string; course_id: string; course_title: string; status: 'completed' | 'in_progress' | 'not_started'; progress: number; completed_at: string | null; certificate_id: string | null; certificate_status: string | null };
+export type Audit = { id: string; action: string; actor_name: string; created_at: string; created_local: string; detail: string; certificate_id?: string; serial_number?: string; learner_name?: string; course_title?: string };
+export type Certificate = { id: string; serial_number: string; learner_id: string; learner_name: string; course_id: string; course_title: string; issued_at: string; issued_local: string; issued_date: string; status: 'active' | 'revoked'; revoked_at: string | null; audits?: Audit[] };
+export type Page<T> = { items: T[]; total: number; page: number; page_size: number };
+export type IssueResult = { operation_id: string; course_id: string; status: string; issued: number; skipped: number; failed: number; outcomes: { learner_id: string; learner_name: string; status: 'issued' | 'skipped' | 'failed'; reason: string; certificate_id: string | null }[] };
