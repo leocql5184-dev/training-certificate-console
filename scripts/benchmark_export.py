@@ -12,6 +12,7 @@ from contextlib import closing
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import socket
 import sqlite3
@@ -49,6 +50,91 @@ def expected_rows(db_path: Path, query: str) -> list[dict]:
         return [dict(row) for row in rows]
 
 
+def start_server(port, env, server_log, creationflags):
+    return subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1",
+         "--port", str(port), "--log-level", "warning"],
+        cwd=ROOT, env=env, stdout=server_log, stderr=subprocess.STDOUT,
+        creationflags=creationflags,
+    )
+
+
+def wait_ready(client, process, log_path):
+    deadline = time.monotonic() + 30
+    while True:
+        if process.poll() is not None:
+            raise RuntimeError(f"Server exited: {log_path.read_text(encoding='utf-8')}")
+        try:
+            if client.get("/api/health", timeout=1).status_code == 200:
+                break
+        except httpx.HTTPError:
+            pass
+        if time.monotonic() > deadline:
+            raise RuntimeError("Temporary benchmark server did not become ready. " + log_path.read_text(encoding="utf-8"))
+        time.sleep(0.1)
+
+
+def stop_server(process, creationflags):
+    if os.name == "nt" and process.poll() is None:
+        # venv's Windows redirector can own another Python process.
+        # Stop only this benchmark's process tree before removing its DB.
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            capture_output=True, creationflags=creationflags,
+        )
+    elif process.poll() is None:
+        process.kill()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
+def interrupt_export(client, process, creationflags, query, expected):
+    params = {"q": query, "sort": "learner_name", "direction": "asc"}
+    with client.stream("GET", "/api/certificates/export.csv", headers=HEADERS, params=params) as partial:
+        partial.raise_for_status()
+        lines = partial.iter_lines()
+        assert next(lines).lstrip("\ufeff").split(",") == list(expected[0])
+        reader = csv.DictReader(lines, fieldnames=list(expected[0]))
+        for offset in range(len(expected) // 2):
+            assert next(reader) == expected[offset]
+        stop_server(process, creationflags)
+    try:
+        client.get("/api/health", timeout=2)
+    except (httpx.ConnectError, httpx.ConnectTimeout):
+        pass
+    else:
+        raise AssertionError("Server still reachable after interruption")
+
+
+def check_recovery(client, db_path, count, query):
+    with closing(sqlite3.connect(db_path)) as db:
+        assert db.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+    home = client.get("/")
+    home.raise_for_status()
+    assert 'id="root"' in home.text
+    assets = re.findall(r'(?:src|href)="(/assets/[^"]+)"', home.text)
+    assert assets
+    for asset in assets:
+        client.get(asset).raise_for_status()
+    for actor, total in (("alice", count), ("bob", min(count, 1000))):
+        listing = client.get("/api/certificates", headers={"X-Actor-Id": actor}, params={"q": query})
+        listing.raise_for_status()
+        assert listing.json()["total"] == total
+    issued = client.post("/api/courses/east-course-safety/issue",
+        headers={**HEADERS, "Idempotency-Key": "after-restart"}, json={})
+    issued.raise_for_status()
+    assert issued.json()["issued"] == 2
+    certificate = next(item["certificate_id"] for item in issued.json()["outcomes"] if item["status"] == "issued")
+    detail = f"/api/certificates/{certificate}"
+    assert client.get(detail, headers={"X-Actor-Id": "bob"}).status_code == 404
+    assert client.post(detail + "/revoke", headers=HEADERS).json()["status"] == "revoked"
+    assert client.get(detail, headers=HEADERS).json()["status"] == "revoked"
+
+
 def run_benchmark(count: int) -> dict:
     with tempfile.TemporaryDirectory(prefix="ocean-export-benchmark-") as temp:
         temp_path = Path(temp)
@@ -74,29 +160,18 @@ def run_benchmark(count: int) -> dict:
         origin = f"http://127.0.0.1:{port}"
         log_path = temp_path / "server.log"
         with log_path.open("w", encoding="utf-8") as server_log:
-            process = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1",
-                 "--port", str(port), "--log-level", "warning"],
-                cwd=ROOT, env=env, stdout=server_log, stderr=subprocess.STDOUT,
-                creationflags=creationflags,
-            )
+            process = start_server(port, env, server_log, creationflags)
             try:
                 with httpx.Client(base_url=origin, timeout=60, trust_env=False) as client:
-                    deadline = time.monotonic() + 30
-                    while True:
-                        if process.poll() is not None:
-                            raise RuntimeError(f"Server exited: {log_path.read_text(encoding='utf-8')}")
-                        try:
-                            if client.get("/api/health", timeout=1).status_code == 200:
-                                break
-                        except httpx.HTTPError:
-                            pass
-                        if time.monotonic() > deadline:
-                            raise RuntimeError("Temporary benchmark server did not become ready. " + log_path.read_text(encoding="utf-8"))
-                        time.sleep(0.1)
+                    wait_ready(client, process, log_path)
                     runs = []
                     list_result = None
-                    for iteration in (1, 2):
+                    for iteration in (1, 2, 3):
+                        if iteration == 3:
+                            interrupt_export(client, process, creationflags, query, expected)
+                            process = start_server(port, env, server_log, creationflags)
+                            wait_ready(client, process, log_path)
+                            check_recovery(client, db_path, count, query)
                         destination = temp_path / f"export-{iteration}.csv"
                         started = time.monotonic()
                         digest = hashlib.sha256()
@@ -137,25 +212,13 @@ def run_benchmark(count: int) -> dict:
                             "bytes": byte_count,
                             "sha256": digest.hexdigest(),
                         })
-                    assert runs[0]["sha256"] == runs[1]["sha256"], "Repeated export order/content is unstable."
+                    assert len({run["sha256"] for run in runs}) == 1, "Repeated export order/content is unstable."
                     return {"status": "passed", "east_generated_rows": count,
                             "west_generated_rows": min(count, 1000), "runs": runs,
+                            "interrupted_after_rows": count // 2, "restarted_on_same_database": True,
                             "concurrent_list": list_result, "default_demo_database_modified": False}
             finally:
-                if os.name == "nt" and process.poll() is None:
-                    # venv's Windows redirector can own another Python process.
-                    # Stop only this benchmark's process tree before removing its DB.
-                    subprocess.run(
-                        ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                        capture_output=True, creationflags=creationflags,
-                    )
-                elif process.poll() is None:
-                    process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=10)
+                stop_server(process, creationflags)
 
 
 if __name__ == "__main__":

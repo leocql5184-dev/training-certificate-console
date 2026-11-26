@@ -469,3 +469,30 @@ def test_student_status_has_three_states_and_retains_certified_history_after_rev
             row["id"]: (row["status"], row["progress"], row["completed_at"])
             for row in final
         } == learning_facts
+
+@pytest.mark.parametrize("actor,tenant,dates", [
+    ("alice", "east", ["2026-01-11", "2026-01-11", "2026-01-10"]),
+    ("bob", "west", ["2026-01-10", "2026-01-10", "2026-01-10"]),
+])
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+def test_a5_date_sort_breaks_local_day_ties_by_id(app_db, actor, tenant, dates, direction):
+    client, path = app_db
+    times = ["13:30", "13:00", "12:30"]
+    with closing(sqlite3.connect(path)) as db, db:
+        ids = [row[0] for row in db.execute(
+            "SELECT id FROM certificates WHERE tenant_id=? ORDER BY id LIMIT 3", (tenant,)
+        )]
+        assert len(ids) == 3
+        for index, cert_id in enumerate(ids):
+            db.execute(
+                "UPDATE certificates SET serial_number=?,issued_at=?,issued_date=? WHERE id=?",
+                (f"DATE-CASE-{index}", f"2026-01-10T{times[index]}:00Z", dates[index], cert_id),
+            )
+    # IDs are ascending while the instants descend. Sorting by timestamp would fail.
+    order = sorted(range(3), key=dates.__getitem__, reverse=direction == "desc")
+    expected = [(f"DATE-CASE-{i}", dates[i]) for i in order]
+    params = {"q": "DATE-CASE-", "sort": "issued_date", "direction": direction}
+    listed = certificates(client, actor, **params)
+    exported = csv_rows(client.get("/api/certificates/export.csv", headers=headers(actor), params=params))
+    for rows in (listed, exported):
+        assert [(row["serial_number"], row["issued_date"]) for row in rows] == expected

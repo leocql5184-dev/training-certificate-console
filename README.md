@@ -47,7 +47,28 @@ python run.py --verify
 python run.py --verify --benchmark
 ```
 
-测试使用临时数据库，不修改正在使用的演示数据。基准启动独立的本地服务，导出两次并检查耗时、行数、顺序及导出期间列表可用性。
+以上命令可从新检出的仓库根目录运行。每个 pytest 用例使用全新的 SQLite 文件，基准使用单独的临时目录和随机端口。签收全套时应看到 pytest 全部通过、基准 JSON 的 `status` 为 `passed`，且整个命令退出码为 0。
+
+### 逐项复现与签收
+
+需要单独复核时，先运行 `python run.py --prepare`，再在 PowerShell 中设置 `$py = '.\.venv\Scripts\python.exe'`。下表命令各自独立，可按任意顺序执行。
+
+| 场景 | 仓库根目录命令 | 签收时核对 |
+|---|---|---|
+| A1 租户隔离 | `& $py -m pytest -v -k test_a1 tests` | Bob 读、撤销 East 证书及签发 East 课程均返回 404。West 导出的所有编号与 West 列表一致，数据库证书、操作、审计总数保持原值。 |
+| A2 请求重试 | `& $py -m pytest -v -k test_a2 tests` | 串行重试、重建应用后重放、6 个客户端调用并发提交，分别核对完整响应相同。每轮一个逻辑操作，每张新证书一条签发审计。 |
+| A3 幂等键冲突 | `& $py -m pytest -v -k test_a3 tests` | 分别只改课程、只改请求体，两次都是 409。恢复原请求并调换 JSON 字段顺序仍返回首次结果，三张表计数相同。 |
+| A4 批量资格 | `& $py -m pytest -v -k 'test_a4 or test_audit_failure' tests` | 新库 East / Safety 101 中 Jordan Chen、Riley Zhang 获证，另四人各有跳过原因。注入一次审计写入失败后，1 人成功、1 人失败、4 人跳过，失败学员没有残留证书。 |
+| A5 时区与日期排序 | `& $py -m pytest -v -k test_a5 tests` | 比较下文的两地固定时间，再用同一天内 ID 与签发时刻反序的三张证书核对列表、CSV、升序和降序。 |
+| A6 导出与恢复 | `python run.py --benchmark` | 查看两次完整导出的耗时、行数、SHA-256 和并发列表状态。另一次导出读到 50,000 行时终止测试服务；同库同端口重启后，第三份完整 CSV 必须与前两份逐行一致。 |
+| A7 撤销审计 | `& $py -m pytest -v -k test_a7 tests` | 对有效证书并发撤销 4 次，再重试 1 次。均返回已撤销，撤销时间相同，审计总数只增加 1。 |
+
+**手动操作时使用新的演示库。** 在新的 PowerShell 窗口运行以下命令并打开 http://127.0.0.1:8010 。每次执行会生成新的数据库文件；停止服务并关闭此窗口即可结束本次演示。A2 和 A4 会消耗同一课程的可签发名额，单独复核首次签发人数时应各用一个新库。
+
+```powershell
+$env:CERT_DB_PATH = Join-Path $env:TEMP ("ocean-review-" + [guid]::NewGuid() + ".db")
+python run.py --port 8010
+```
 
 ### A1：租户隔离
 
@@ -96,6 +117,12 @@ python run.py --port 8010
 - 没有实现生产认证、通知、云部署或证书 PDF，这些不属于本项目范围。
 
 ## 考核提交材料
+
+### 已知问题与验证边界
+
+- 学员目录会一次取回本租户的学员及选课记录，再由浏览器筛选选课。十万行基准覆盖证书列表与导出；学员目录的大数据量响应和渲染耗时未设上限。
+- 自动化验证覆盖 HTTP、数据库和构建产物。按钮禁用、确认对话框和错误重试等浏览器交互仍依赖人工回归；以前的浏览器检查见 [验证记录](docs/verification.md)。
+- 单独移走 `.venv` 并保留 `.runtime/python-dependencies.sha256` 时，启动脚本可能为新环境跳过依赖安装。遇到此情况可在新建的项目虚拟环境运行 `.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt`，再启动。
 
 本仓库是可运行项目。正式提交还需完整 AI 原生会话导出、会话索引、关联 Git 提交的决策日志、工具操作记录和完整性声明；规划与子代理交互也要纳入。不能用代码或本 README 替代原始会话证据。
 
