@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AlertCircle, ChevronDown, CircleCheck, Inbox, LoaderCircle, Search, X } from 'lucide-react';
 
 export function Status({ value }: { value: string }) {
-  const names: Record<string, string> = { active: '有效', revoked: '已撤销', completed: '已完成', in_progress: '学习中', not_started: '未开始', issued: '已签发', skipped: '已跳过', failed: '失败' };
+  const names: Record<string, string> = { active: '有效', revoked: '已撤销', completed: '已完成', incomplete: '未完成', certified: '已获得证书', issued: '已签发', skipped: '已跳过', failed: '失败' };
   return <span className={`status status-${value}`}><span className="status-dot" />{names[value] || value}</span>;
 }
 

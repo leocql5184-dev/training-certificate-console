@@ -418,3 +418,54 @@ def test_csv_quotes_names_and_neutralizes_spreadsheet_formulas(app_db):
     target = next(row for row in rows if row["serial_number"] == "OCE-EAST-2026-010001")
     assert target["learner_name"].startswith("'=HYPERLINK")
     assert target["course_title"] == 'Safety, "101"\nSecond line'
+
+
+def test_student_status_has_three_states_and_retains_certified_history_after_revocation(client):
+    for actor in ("alice", "bob"):
+        initial = get_json(client, "/api/enrollments", actor)
+        assert {row["student_status"] for row in initial} == {
+            "incomplete", "completed", "certified"
+        }
+        assert {row["status"] for row in initial if row["student_status"] == "incomplete"} == {
+            "not_started", "in_progress"
+        }
+        learning_facts = {
+            row["id"]: (row["status"], row["progress"], row["completed_at"])
+            for row in initial
+        }
+        for row in initial:
+            if row["certificate_id"]:
+                assert row["student_status"] == "certified"
+            elif row["status"] == "completed":
+                assert row["student_status"] == "completed"
+            else:
+                assert row["student_status"] == "incomplete"
+        assert any(
+            row["student_status"] == "certified" and row["certificate_status"] == "revoked"
+            for row in initial
+        )
+
+        eligible = next(row for row in initial if row["student_status"] == "completed")
+        response = issue(client, eligible["course_id"], f"three-states-{actor}", actor=actor)
+        assert response.status_code == 200, response.text
+        issued = next(
+            row for row in get_json(client, "/api/enrollments", actor)
+            if row["id"] == eligible["id"]
+        )
+        assert issued["student_status"] == "certified"
+        assert issued["certificate_id"] and issued["certificate_status"] == "active"
+
+        revoked = client.post(
+            f"/api/certificates/{issued['certificate_id']}/revoke",
+            headers=headers(actor), json={},
+        )
+        assert revoked.status_code == 200, revoked.text
+        final = get_json(client, "/api/enrollments", actor)
+        history = next(row for row in final if row["id"] == eligible["id"])
+        assert history["student_status"] == "certified"
+        assert history["certificate_id"] == issued["certificate_id"]
+        assert history["certificate_status"] == "revoked"
+        assert {
+            row["id"]: (row["status"], row["progress"], row["completed_at"])
+            for row in final
+        } == learning_facts

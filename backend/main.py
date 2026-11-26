@@ -179,7 +179,10 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 args.append(course_id)
             return [dict(row) for row in db.execute("""SELECT e.id,e.learner_id,l.name AS learner_name,l.email AS learner_email,
                 e.course_id,co.title AS course_title,e.status,e.progress,e.completed_at,
-                c.id AS certificate_id,c.status AS certificate_status
+                c.id AS certificate_id,c.status AS certificate_status,
+                CASE WHEN c.id IS NOT NULL THEN 'certified'
+                     WHEN e.status='completed' THEN 'completed'
+                     ELSE 'incomplete' END AS student_status
                 FROM enrollments e JOIN learners l ON l.tenant_id=e.tenant_id AND l.id=e.learner_id
                 JOIN courses co ON co.tenant_id=e.tenant_id AND co.id=e.course_id
                 LEFT JOIN certificates c ON c.tenant_id=e.tenant_id AND c.enrollment_id=e.id """ + where + " ORDER BY co.title,l.name,e.id", args)]

@@ -18,7 +18,7 @@ All protected endpoints use `X-Actor-Id` header (`alice`, `bob` demo IDs). Actor
 - GET /api/overview -> {learners:int,courses:int,enrollments:int,completed:int,eligible:int,active_certificates:int,revoked_certificates:int}
 - GET /api/courses -> [{id,title,description,enrolled_count,completed_count,eligible_count,certificate_count}]
 - GET /api/learners?q= -> [{id,name,email,enrolled_count,completed_count,certificate_count}]
-- GET /api/enrollments?course_id=&q= -> [{id,learner_id,learner_name,learner_email,course_id,course_title,status:"completed"|"in_progress"|"not_started",progress:int,completed_at:string|null,certificate_id:string|null,certificate_status:string|null}]
+- GET /api/enrollments?course_id=&q= -> [{id,learner_id,learner_name,learner_email,course_id,course_title,status:"completed"|"in_progress"|"not_started",student_status:"incomplete"|"completed"|"certified",progress:int,completed_at:string|null,certificate_id:string|null,certificate_status:string|null}]
 - GET /api/certificates?q=&sort=issued_date&direction=desc&page=1&page_size=10&status=&course_id= -> {items:[Certificate],total,page,page_size}. sort enum: learner_name, course_title, serial_number, issued_date; status active/revoked. Append ID tie-breaker consistently to list/export.
 - Certificate: {id,serial_number,learner_id,learner_name,course_id,course_title,issued_at,issued_local,issued_date,status:"active"|"revoked",revoked_at:string|null}. issued_local is YYYY-MM-DD HH:mm. issued_date is YYYY-MM-DD.
 - GET /api/certificates/{id} -> Certificate plus {audits:[{id,action,actor_name,created_at,created_local,detail}]}
@@ -37,3 +37,6 @@ Operate mode. Chinese interface named Ocean Academy / 学习与认证工作台. 
 
 ## Verification
 Automate A1-A7 using an isolated temporary SQLite file. Verify list/export search, stable duplicate-key ordering, local date, sequential and concurrent idempotency, key misuse, no cross-tenant side effects, repeated revoke. Run a real 100k-row HTTP streaming benchmark with a concurrent list request. Verify browser workflow and error/empty states. One documented startup command prepares declared dependencies, seeds data, builds React and serves the complete app on loopback; verification is separate.
+
+## Student status (user update)
+The UI and learning-status filter expose exactly 未完成 / 已完成 / 已获得证书, from the server-derived student_status field. Existing raw learning progress is preserved: not_started and in_progress map to incomplete; completed with no certificate maps to completed; any issued certificate maps to certified. Revoked certificates remain historical issuance and expose revoked separately in the certificate column.

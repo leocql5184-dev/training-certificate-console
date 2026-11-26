@@ -147,7 +147,7 @@ tbody tr:hover { background: #fafcfc; }
 .status-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
 .status-active, .status-completed, .status-issued { background: #eaf6ef; color: #277b58; }
 .status-revoked { background: #f6efed; color: #91645e; }
-.status-in_progress { background: #edf2fc; color: #5378b1; }
+.status-certified { background: #edf2fc; color: #5378b1; }
 .status-failed { background: #fff0ed; color: #b04437; }
 .status-skipped { background: #f6f3eb; color: #8a7442; }
 .table-action { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 500; color: #548177; border: 0; background: transparent; padding: 6px; border-radius: 5px; }
