@@ -90,17 +90,17 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
     async def database_error(_: Request, exc: sqlite3.OperationalError):
         logger.exception("Database operation failed", exc_info=exc)
         if "locked" in str(exc).lower() or "busy" in str(exc).lower():
-            return JSONResponse(status_code=503, content={"detail": "数据库忙，请使用相同幂等键重试。"}, headers={"Retry-After": "1"})
-        return JSONResponse(status_code=500, content={"detail": "数据库操作失败，请稍后重试。"})
+            return JSONResponse(status_code=503, content={"detail": "Database busy. Retry with the same idempotency key."}, headers={"Retry-After": "1"})
+        return JSONResponse(status_code=500, content={"detail": "Database operation failed. Please try again."})
 
     def get_actor(x_actor_id: Annotated[str | None, Header()] = None) -> dict:
         if not x_actor_id:
-            raise HTTPException(401, "请选择管理员身份（X-Actor-Id）。")
+            raise HTTPException(401, "Select an administrator the X-Actor-Id header.")
         db = connect(path)
         try:
             row = db.execute("SELECT a.*, t.name AS tenant_name, t.timezone FROM admins a JOIN tenants t ON t.id=a.tenant_id WHERE a.id=?", (x_actor_id,)).fetchone()
             if row is None:
-                raise HTTPException(401, "管理员身份无效。")
+                raise HTTPException(401, "Unknown administrator.")
             return dict(row)
         finally:
             db.close()
@@ -108,7 +108,7 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
     def find_certificate(db: sqlite3.Connection, certificate_id: str, actor: dict) -> dict:
         row = db.execute(CERT_SELECT + " WHERE c.tenant_id=? AND c.id=?", (actor["tenant_id"], certificate_id)).fetchone()
         if row is None:
-            raise HTTPException(404, "证书不存在。")
+            raise HTTPException(404, "Certificate not found.")
         return certificate_json(row, actor["timezone"])
 
     @application.get("/api/health")
@@ -273,25 +273,25 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
     def issue(course_id: str, payload: dict = Body(default_factory=dict),
               idempotency_key: Annotated[str | None, Header()] = None, actor: dict = Depends(get_actor)):
         if not idempotency_key or not idempotency_key.strip() or len(idempotency_key) > 200:
-            raise HTTPException(400, "需要 1–200 字符的 Idempotency-Key。")
+            raise HTTPException(400, "Supply an Idempotency-Key between 1 and 200 characters.")
         tenant = actor["tenant_id"]
         try:
             canonical_request = json.dumps({"course_id": course_id, "payload": payload}, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         except (ValueError, TypeError):
-            raise HTTPException(422, "请求内容必须是有效 JSON，不能包含 NaN 或 Infinity。") from None
+            raise HTTPException(422, "Request body must be valid JSON, and must not contain NaN or Infinity.") from None
         request_hash = hashlib.sha256(canonical_request.encode()).hexdigest()
         db = connect(path)
         try:
             # Authenticate and authorize before creating even an operation/audit record.
             if db.execute("SELECT id FROM courses WHERE tenant_id=? AND id=?", (tenant, course_id)).fetchone() is None:
-                raise HTTPException(404, "课程不存在。")
+                raise HTTPException(404, "Course not found.")
             db.execute("BEGIN IMMEDIATE")
             previous = db.execute("SELECT request_hash,result_json FROM operations WHERE tenant_id=? AND idempotency_key=?", (tenant, idempotency_key)).fetchone()
             if previous:
                 if previous["request_hash"] != request_hash:
-                    raise HTTPException(409, "此幂等键已用于其他请求，请为新操作使用新键。")
+                    raise HTTPException(409, "This key belongs to a different request. Use a new key for a new operation.")
                 if previous["result_json"] is None:
-                    raise HTTPException(503, "操作尚未完成，请使用相同幂等键重试。")
+                    raise HTTPException(503, "Operation in progress. Retry with the same key.")
                 return json.loads(previous["result_json"])
             operation_id = uuid.uuid4().hex
             now = utc_now()
@@ -304,23 +304,23 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
             for enrollment in enrollments_to_issue:
                 outcome = {"learner_id": enrollment["learner_id"], "learner_name": enrollment["learner_name"], "status": "skipped", "reason": "", "certificate_id": enrollment["certificate_id"]}
                 if enrollment["status"] != "completed":
-                    outcome["reason"] = "课程尚未完成。"
+                    outcome["reason"] = "Course incomplete."
                 elif enrollment["certificate_id"]:
-                    outcome["reason"] = "已有证书且已撤销，本次不重新签发。" if enrollment["certificate_status"] == "revoked" else "已获证，无需重复签发。"
+                    outcome["reason"] = "Previously revoked; ineligible for reissue." if enrollment["certificate_status"] == "revoked" else "Already certified."
                 else:
                     db.execute("SAVEPOINT issue_learner")
                     try:
                         certificate_id = uuid.uuid4().hex
                         serial = f"OCE-{tenant.upper()}-{now[:4]}-{uuid.uuid4().hex.upper()}"
                         db.execute("INSERT INTO certificates VALUES (?,?,?,?,?,?,?,?,?,?,?)", (certificate_id, tenant, enrollment["id"], enrollment["learner_id"], course_id, operation_id, serial, now, local_time(now, actor["timezone"])[:10], "active", None))
-                        db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, tenant, actor["id"], certificate_id, operation_id, "issued", now, "课程已完成，批量签发证书。"))
+                        db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, tenant, actor["id"], certificate_id, operation_id, "issued", now, "Issued in bulk after course completion."))
                         db.execute("RELEASE SAVEPOINT issue_learner")
-                        outcome.update(status="issued", reason="证书签发成功。", certificate_id=certificate_id)
+                        outcome.update(status="issued", reason="Certificate issued.", certificate_id=certificate_id)
                     except sqlite3.IntegrityError:
                         db.execute("ROLLBACK TO SAVEPOINT issue_learner")
                         db.execute("RELEASE SAVEPOINT issue_learner")
                         logger.exception("Issuance constraint failed for enrollment %s", enrollment["id"])
-                        outcome.update(status="failed", reason="数据约束校验失败，未生成证书或审计记录。", certificate_id=None)
+                        outcome.update(status="failed", reason="Constraint check failed. No certificate or audit event was saved.", certificate_id=None)
                 result[outcome["status"]] += 1
                 result["outcomes"].append(outcome)
             db.execute("UPDATE operations SET status='completed',result_json=? WHERE tenant_id=? AND id=?", (json.dumps(result, ensure_ascii=False), tenant, operation_id))
@@ -342,7 +342,7 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 now = utc_now()
                 changed = db.execute("UPDATE certificates SET status='revoked',revoked_at=? WHERE tenant_id=? AND id=? AND status='active'", (now, actor["tenant_id"], certificate_id)).rowcount
                 if changed:
-                    db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, actor["tenant_id"], actor["id"], certificate_id, None, "revoked", now, "管理员确认撤销证书。"))
+                    db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, actor["tenant_id"], actor["id"], certificate_id, None, "revoked", now, "Administrator confirmed revocation."))
             result = find_certificate(db, certificate_id, actor)
             db.commit()
             return result
@@ -375,7 +375,7 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         @application.get("/{frontend_path:path}", include_in_schema=False)
         def frontend(frontend_path: str):
             if frontend_path == "api" or frontend_path.startswith("api/"):
-                raise HTTPException(404, "接口不存在。")
+                raise HTTPException(404, "Endpoint not found.")
             requested = (dist / frontend_path).resolve()
             if requested.is_relative_to(dist.resolve()) and requested.is_file():
                 return FileResponse(requested)

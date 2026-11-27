@@ -1,35 +1,18 @@
-# 核心实体与关联
+# Data model
 
-所有租户业务数据都带有 tenant_id。管理员身份由服务器映射为租户，查询参数不能改变身份归属。同名学员和课程以不同 ID 区分，不能用名字关联。
+| Entity | Purpose and relationships |
+|---|---|
+| tenants | Own the time zone and all tenant-scoped business records. |
+| admins | Each administrator belongs to one tenant. The actor header identifies the administrator. |
+| learners | Belong to one tenant. Display names can match across tenants. |
+| courses | Belong to one tenant. A title can appear in both tenants. |
+| enrollments | Join a learner to a course in the same tenant. Store progress, completion status and completion time. |
+| certificates | At most one per tenant, learner and course. Store serial number, UTC issue time, local issue date, status and optional revocation time. |
+| operations | Bind a tenant-scoped idempotency key to a course, request digest and complete outcome. A single operation can issue multiple certificates. |
+| audit_events | Connect the tenant, actor and certificate to an issuance or revocation, and to the operation when applicable. |
 
-| 实体 | 角色 | 主要关联与约束 |
-|---|---|---|
-| tenants | 租户及 IANA 时区 | 一对多关联全部租户业务数据 |
-| admins | 演示管理员 | 一个管理员仅属于一个租户；操作记录和审计记录引用管理员 |
-| learners | 学员目录 | 属于租户，通过 enrollments 关联课程 |
-| courses | 课程目录 | 属于租户，通过 enrollments 关联学员 |
-| enrollments | 选课与学习记录 | 学员、课程多对多的中间表；同租户同学员同课程唯一；记录进度、完成时间 |
-| certificates | 证书及状态 | 一条学习记录最多一张证书；关联签发操作；记录 UTC 时间、本地日期及撤销时间 |
-| operations | 幂等操作记录 | 记录管理员、租户、幂等键、请求摘要及最终结果；一个操作可签发多张证书 |
-| audit_events | 操作审计 | 关联证书、管理员、租户和操作；每次实际签发一条审计，首次撤销一条审计 |
+Both tenants contain Alex Lee, Jordan Chen, Morgan Wang, Taylor Lin, Casey Wu and Riley Zhang. Both offer Safety 101, Data Privacy and Workplace Essentials. The seed covers eligible, incomplete, previously certified and revoked cases as well as an instant that falls on different local dates.
 
-关系可概括为：租户包含管理员、学员和课程；学员通过学习记录选课；合格学习记录产生证书；批量签发操作关联签出的证书；证书的签发和撤销均产生审计事件。
+Composite foreign keys enforce tenant ownership. A retried issue replays the stored result; changing the course or payload returns 409. Certificate and audit writes are transactional. Revocation retains the unique certificate relationship and its history. Repeated revocations add no audit events.
 
-## 同名种子数据
-
-East 与 West 各包含 Alex Lee、Jordan Chen、Morgan Wang、Taylor Lin、Casey Wu、Riley Zhang；两边课程均为 Safety 101、Data Privacy、Workplace Essentials。名称一致，主键和租户归属不同。管理员分别为 alice@east.test、bob@west.test。
-
-覆盖已完成可签发、学习中、未开始、已获证、已撤销、同名跨租户、跨本地日期等情况。完整名单与最终状态以数据库 seed 实现为准。
-
-## 一致性规则
-
-- 复合外键约束业务关系不能跨租户。学习记录、证书和审计不能指向其他租户的学员或课程。
-- 同一个幂等键和请求返回保存的结果；更换课程或 payload 返回 409。
-- 写入证书、对应审计、操作结果处于同一事务；重试不会产生额外记录。
-- 撤销改变证书状态，不删除历史；重复撤销不重复写审计。
-- 本次明确采用撤销后不重发策略，原证书继续占用唯一关系。
-- SQLite 持久化保存数据；重复启动不会重置用户操作。
-
-## 学生状态显示
-
-学习记录统一显示三种学生状态：未完成、已完成、已获得证书。未开始和学习中的原始进度保留，界面统一显示未完成；完成但未签发显示已完成；已有证书显示已获得证书。证书是否撤销单独显示，不抹去历史获证事实。
+The UI derives three learning states. Not-started and in-progress enrollments display as Incomplete. A completed enrollment without a certificate displays as Completed. A learner who has received a certificate displays as Certified, including after revocation. The certificate itself separately shows Active or Revoked.

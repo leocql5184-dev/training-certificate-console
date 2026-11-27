@@ -22,7 +22,7 @@ def generate(count: int = 100_000, tenant: str = "east", db_path: str | None = N
         actor = db.execute("SELECT id FROM admins WHERE tenant_id=? ORDER BY id LIMIT 1", (tenant,)).fetchone()["id"]
         course_id = f"{tenant}-course-load"
         db.execute("BEGIN IMMEDIATE")
-        db.execute("INSERT OR IGNORE INTO courses VALUES (?,?,?,?)", (course_id, tenant, "Export Load Test", "按需生成的导出性能验证数据，不属于默认演示数据。"))
+        db.execute("INSERT OR IGNORE INTO courses VALUES (?,?,?,?)", (course_id, tenant, "Export Load Test", "On-demand export benchmark data, separate from the quick-start dataset."))
         base = datetime(2026, 1, 10, 13, 30, tzinfo=timezone.utc)
         for index in range(1, count + 1):
             suffix = f"{index:06d}"
@@ -36,7 +36,7 @@ def generate(count: int = 100_000, tenant: str = "east", db_path: str | None = N
             created = db.execute("INSERT OR IGNORE INTO certificates VALUES (?,?,?,?,?,?,?,?,?,?,?)", (certificate_id, tenant, enrollment_id, learner_id, course_id, None, f"LOAD-{tenant.upper()}-{suffix}", timestamp, local_time(timestamp, timezone_name)[:10], "active", None)).rowcount
             if created:
                 inserted += 1
-                db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (f"{certificate_id}-issued", tenant, actor, certificate_id, None, "issued", timestamp, "按需生成：导出性能验证证书。"))
+                db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (f"{certificate_id}-issued", tenant, actor, certificate_id, None, "issued", timestamp, "Generated for the export benchmark."))
         db.commit()
         return inserted
     except BaseException:

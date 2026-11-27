@@ -1,16 +1,15 @@
-# 完整性声明
+# Completeness declaration
 
-候选人在主会话中确认“三题均独立完成，只有这些 Codex 会话”。第 6 节三题由候选人独立作答，未使用 AI 辅助。候选人将答案粘贴到对话框后，打包过程按原文写入 written-answers.md，保留原字词、符号与换行。
+For the submitted assessment, the candidate confirmed that all three Section 6 answers were completed independently and that the listed Codex sessions were the only AI interactions used. The submitted answer file preserves the candidate's own text, punctuation and line breaks.
 
-## 会话与工具
+The session index lists one main Codex Desktop interaction and seven project subagent sessions. Timestamps are UTC. Public files have consistent pseudonymous identifiers. Child logs may contain inherited context. The main session's end time marks the archive cutoff; the final packaging, commit and delivery reply occurred afterwards.
 
-- session-index.csv 列出与本项目关联的 8 个交互会话（1 个主会话、7 个项目子会话）。时间使用 UTC；公开文件名使用一致的会话代号。子会话可能含继承的上文。主会话的 ended_at 为归档截点；最后一条提交、封包及交付回复发生在截点之后。
-- sessions/ 的 JSONL 由 Codex Desktop 原生 rollout 按原顺序提取，包含用户消息、助手可见回复、子代理消息、模型标识、工具调用、返回、错误及时间。命令、补丁和重试与会话保存在一起。不是原始运行时文件的逐字节副本。屏幕二进制、工具平台配置/操作规范、账号与非项目工作站信息有删节；客户端本已截断的输出和原生记录中仅含加密占位的消息片段无法还原。截图和考核原始 PDF 在本地评审包内。
-- 使用的 AI 工具为 Codex Desktop 及其子代理。由会话调用的工具包括 PowerShell、Git、Python/PDF 提取与渲染、SQLite、npm/Vite、pytest、HTTP 客户端、浏览器自动化、Playwright，以及界面检查工具。工具标识与具体命令以 JSONL 为准。项目与用户级协作说明分别在 AGENTS.md 和 ai/instructions/。
-- 导出排除重复界面事件、平台私有配置、模型内部推理和加密状态。平台另记录了非交互式执行审批，本次目录下有 4 个 guardian / codex-auto-review 服务记录，其内部审查不作为候选人交互会话提交；执行请求、失败与返回值按主会话或子会话可见范围保存。候选人未报告其他 AI、会话或内联补全。
+The chronological JSONL records were extracted from native Codex rollouts. They include user messages, visible assistant responses, agent messages, model identifiers, commands, edits, tool results, failures and retries. Screen binaries, platform configuration, private machine paths and unrelated account information have redactions. Truncated output and encrypted-only fragments could not be recovered. The local assessment package contains the original brief and screenshots.
 
-## 时间与提交边界
+Tools included Codex Desktop and its subagents, PowerShell, Git, Python PDF extraction and rendering, SQLite, npm, Vite, pytest, HTTP clients, browser automation, Playwright and UI inspection tools. Four noninteractive execution-approval records were identified. Internal approval reasoning, private runtime configuration, duplicate UI events and encrypted state are outside the transcript export. The candidate reported no other AI tools, sessions or inline completion.
 
-题目要求一次性 60 分钟，包含答卷和打包。从主会话 2026-11-26 13:05:39 UTC 到候选人粘贴答卷的 14:10:55 UTC 已超过 65 分钟，之后还有打包操作。此提交超过题面时间限制。Git 历史和会话时间保留实际值。最终包附 Git bundle 和最终提交 SHA，包含 main 与验证前备份分支。
+The brief allows one 60-minute sitting, including answers and packaging. The main session started at 13:05:39 UTC on 26 November 2026. The candidate supplied the answers at 14:10:55 UTC, over 65 minutes later, before packaging. The recorded submission exceeded the time limit.
 
-公开版使用稳定的会话代号替代主机与会话标识。含个人设备目录、考核方原文及相关附件的记录另作隐私删节。提交记录使用项目通用身份。
+## Post-submission English edition
+
+Codex assisted with the English product interface, server messages, test labels and documentation after the original submission. This later localization falls outside the eight-session evidence snapshot above. The original evidence remains in its recorded language. Section 6 explicitly reserves translation as well as authorship to the candidate.

@@ -159,9 +159,9 @@ def init_db(path: str | Path | None = None) -> None:
 def seed_demo(db: sqlite3.Connection) -> None:
     names = ["Alex Lee", "Jordan Chen", "Morgan Wang", "Taylor Lin", "Casey Wu", "Riley Zhang"]
     courses = [
-        ("safety", "Safety 101", "掌握工作场所安全规范、风险识别和应急处理。"),
-        ("privacy", "Data Privacy", "理解个人信息保护、数据分类与安全处理原则。"),
-        ("workplace", "Workplace Essentials", "建立团队协作、职业沟通和日常工作规范。"),
+        ("safety", "Safety 101", "Workplace safety, hazard recognition and emergency response."),
+        ("privacy", "Data Privacy", "Personal information protection, data classification and secure handling."),
+        ("workplace", "Workplace Essentials", "Teamwork, workplace communication and professional conduct."),
     ]
     # Completed eligible, incomplete, not started, already certified, revoked.
     states = [
@@ -199,9 +199,9 @@ def seed_demo(db: sqlite3.Connection) -> None:
                      local_time(issued_at, tz)[:10], cert_status, revoked_at),
                 ).rowcount
                 if inserted:
-                    db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (f"{certificate_id}-issued", tenant, actor, certificate_id, None, "issued", issued_at, "演示数据：学员完成课程，签发证书。"))
+                    db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (f"{certificate_id}-issued", tenant, actor, certificate_id, None, "issued", issued_at, "Demo record: issued after course completion."))
                     if revoked_at:
-                        db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (f"{certificate_id}-revoked", tenant, actor, certificate_id, None, "revoked", revoked_at, "演示数据：证书已撤销，保留历史记录。"))
+                        db.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?)", (f"{certificate_id}-revoked", tenant, actor, certificate_id, None, "revoked", revoked_at, "Demo record: revoked; history retained."))
 
 
 if __name__ == "__main__":

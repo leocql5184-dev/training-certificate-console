@@ -1,75 +1,22 @@
-# 验证记录
+# Verification record
 
-日期：2026-11-26。环境：Windows，本地 Python 3.12、Node.js 24；依赖固定于 requirements.lock.txt 和 frontend/package-lock.json。
+## Submitted build
 
-## 学员目录与界面回归
+On Windows, with Python 3.12 and Node.js 24, the final submitted build passed 41 tests in 24.49 seconds. The test runner reported one Starlette TestClient deprecation warning. The two browser scenarios used the built React application and a disposable SQLite database.
 
-运行 `python run.py --verify --benchmark`，41 项测试通过（24.49 秒），1 条 TestClient 弃用提示。两条新增浏览器用例在真实 FastAPI 服务和隔离 SQLite 数据库上操作构建后的 React 页面：
+- With 100,006 East learners, the directory initially requested 20 rows. Searching for Alex Lee sent no enrollment request before expansion. Expanding the row sent one learner-scoped request and returned three enrollments. Switching to Bob exposed the West learner; requesting the East ID returned an empty array.
+- The browser verified disabled issue controls during submission and a retry with the original key after a committed response was lost. Cancelling revocation sent zero mutation requests; confirmation sent one. A simulated 503 on the certificate list recovered after Reload.
 
-- East 有 100,006 名学员时，目录首个响应仅含 20 人；可翻到第 2 页再搜索 Alex Lee。展开前浏览器没有请求选课，展开后唯一的选课请求按 East 学员 ID 返回 3 条。切换到 Bob 后显示 West 同名学员，使用 Bob 请求该 East ID 返回空数组。
-- 签发提交期间按钮禁用。在服务端提交成功后模拟响应丢失，页面重试沿用同一幂等键。取消撤销时浏览器发出 0 次撤销请求，确认时发出 1 次并显示已撤销。证书列表收到模拟的 503 后，可点击重新加载恢复列表。
+## Export and recovery
 
-A6 同轮两次导出分别用时 0.719 和 0.438 秒；读到第 50,000 行终止服务后，重启并重新导出用时 0.968 秒。三次完整下载均为 100,000 行，摘要相同。
+On the same run the first two 100,000-row exports took 0.719 s and 0.438 s. A fresh download was interrupted after 50,000 rows. Following a process restart, a complete export took 0.968 s. All three complete files matched the independently queried rows and had SHA-256 f69de31f380dd8196b8c444d3653cfcae8eb20e50cfc8e790626d57116e08152. These are observations on the test machine.
 
-## 评委复现记录
+An earlier clean checkout passed 39 tests in 3.66 s. Both demo actors initially had seven certificates. The two exports took 0.703 s and 0.453 s, the concurrent list returned 200 in 0.250 s, and the post-restart export took 0.469 s. The home page, static assets, tenant list totals, issuance, cross-tenant rejection and revocation were checked after restart. SQLite integrity and foreign-key checks passed. The first interruption test had accepted only connection refusal; Windows also reported a connection timeout after confirmed process exit. The corrected assertion accepted both connection failures.
 
-从本地 Git 仓库克隆独立副本，叠加本次两份测试文件，使用副本新建的虚拟环境和前端依赖运行 `python run.py --verify --benchmark`。安装使用了本机可用的包缓存。TypeScript 与 Vite 构建成功，pytest **39 passed，3.66 秒**，另有一条 Starlette TestClient 弃用提示。完整命令退出码为 0。独立副本随后使用 `python run.py --port <空闲端口>` 启动，首页包含 React 挂载节点，健康接口返回 ok，两位管理员首次查询各有 7 张证书。
+## Earlier checks
 
-| 本轮真实 HTTP 验收 | 观测结果 |
-|---|---|
-| East 十万行，按重复姓名升序导出两次 | 0.703 秒、0.453 秒；各 100,000 行 |
-| 第一次下载打开期间另取证书列表 | 导出开始后 0.156 秒发起，HTTP 200，耗时 0.250 秒 |
-| 另开一次下载，逐行读到 50,000 行后强制结束服务 | 原进程退出，健康请求无法建立连接；同一端口和 SQLite 文件重启成功 |
-| 重启后页面、数据与写入 | 首页及其静态资源请求成功；两租户筛选分别命中 100,000 和 1,000 行；新签发 2 张，跨租户查看返回 404，同租户撤销并查回状态成功；SQLite 完整性和外键检查通过 |
-| 重启后重新完整下载 | 0.469 秒，100,000 行。三份完整 CSV 均与独立 SQL 逐行一致，SHA-256 均为 `f69de31f380dd8196b8c444d3653cfcae8eb20e50cfc8e790626d57116e08152` |
+The initial API suite passed 34 tests in 3.08 s after a sandbox socket restriction interrupted an earlier run. Initial browser checks exercised actor switching, the fixed West local date, individualized issuance outcomes, CSV contents, revocation history and empty search results. A 390 px viewport retained horizontal scrolling within wide tables. Review caught stale search parameters during export, late initial course selection and overflow from a visually hidden table heading. The fixes and their verification remain in the original commit history.
 
-首次运行中断测试时，Windows 在进程退出后报告连接超时，原断言只接受连接被拒绝，此轮失败。调整断言接受两种无法建立连接的结果后，上述独立副本通过全套验证。
+## Post-submission English build
 
-## 早期后端验收记录
-
-`python -m pytest -q tests`：**34 passed，3.08 秒**。测试由项目 `.venv` 执行，数据库隔离到临时目录。
-
-覆盖：同名种子数据与全部学习状态；全部受保护接口的租户范围；非法身份；串行/并发/重启幂等；同键不同请求 409；不同键仍不能重复签发；日期转换与排序；搜索、分页和稳定 CSV 顺序；撤销防重；复合租户外键；审计写入失败和操作结果保存失败的事务回滚；CSV 引号与公式防护。
-
-首次在 Windows 受限沙箱中运行 TestClient 因本地 socketpair 权限挂起，该次不计为通过。停止该进程后，在允许本机 socket 的执行环境完成上述测试。存在一条 Starlette/httpx 上游弃用警告，不影响测试结果。
-
-## 十万行真实 HTTP 导出
-
-执行 `.venv/Scripts/python.exe -X utf8 scripts/benchmark_export.py`，临时生成 East 100,000 张证书和 West 1,000 张证书。查询 Load Learner，按姓名升序及 ID 稳定排序。两次 CSV 与直接 SQL 查询结果逐行比较完全一致。
-
-| 项目 | 结果 |
-|---|---|
-| 第一次导出 | 100,000 行，0.672 秒 |
-| 第二次导出 | 100,000 行，0.438 秒 |
-| 每个文件 | 6,300,056 字节 |
-| SHA-256（两次相同） | f69de31f380dd8196b8c444d3653cfcae8eb20e50cfc8e790626d57116e08152 |
-| 首次导出期间请求列表 | HTTP 200，0.265 秒；导出开始后 0.141 秒发起 |
-| 默认演示数据库 | 未被性能测试修改 |
-
-这是本机测量结果，不代表所有硬件或生产负载下的承诺。
-
-## 前端与完整启动
-
-- TypeScript 类型检查及 Vite 生产构建通过。
-- 实际通过 `python run.py --port 8000` 完成依赖准备、React 构建、数据初始化和完整应用启动；健康接口返回 ok。
-- 浏览器实际验证 Alice/East 与 Bob/West 切换、West 固定 UTC 示例显示 2026-01-10 21:30。
-- 在独立 QA 数据库里，Data Privacy 批量签发返回 2 人成功、4 人跳过、0 人失败；逐人原因正确。
-- 浏览器确认撤销后，证书状态变为已撤销，同时详情包含一次签发和一次撤销审计。
-- 搜索 Alex Lee 后下载 CSV，实际文件读取为 3 行，均为 Alex Lee，课程为 Data Privacy、Workplace Essentials、Safety 101（QA 数据库已签发新证书）。
-- 无匹配搜索显示明确空结果和清除筛选入口。
-- 学员目录可以展开 Alex Lee 的三门课程、完成时间及证书入口；审计页显示租户内记录。
-- 浏览器控制台错误列表为空。
-
-## 检查中修复的问题
-
-1. 搜索防抖期间立即导出可能沿用旧查询。现导出按钮与处理函数都检查搜索是否同步，以及列表是否加载/出错；浏览器填入搜索词后立即检查按钮，确认不可提交。
-2. 批量签发抽屉打开时课程尚未加载，课程到达后未自动选中。现补自动选择，并禁用无课程时的签发入口。
-3. 表格内绝对定位的隐藏表头导致窄屏页面整体溢出。滚动容器建立定位上下文后，390px 视口的页面宽度为 390px；恢复用户实际 739px 视口后页面宽度为 739px。宽表只在自身容器内滚动。
-
-桌面 1440px、手机 390px 和用户实际视口截图保存在本机 `.impeccable/review/`（不入 Git）。机械设计检查返回空发现列表。
-
-## 首轮验证结束时的状态
-
-最终服务使用默认 `data/certificates.db`，QA 的签发与撤销未进入默认演示数据。默认各租户依然有 6 学员、3 课程、18 学习记录、5 张有效证书、2 张撤销证书及 4 人次可签发记录。网站仅在本机运行。
-
-正式考核的完整 AI 会话证据及候选人书面答案不在这份运行验证报告的通过声明范围内，详见 README。
+The English build passed the complete verification command, including the two browser scenarios. With 100,000 East rows, the first two exports took 0.672 and 0.469 seconds; the concurrent list completed in 0.250 seconds. After interruption at row 50,000 and restart on the same database, the complete export took 0.453 seconds. All three SHA-256 digests matched the submitted build.

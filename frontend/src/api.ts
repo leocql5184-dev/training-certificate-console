@@ -6,7 +6,7 @@ export async function request<T>(path: string, actor?: string, options: RequestI
   if (options.body) headers.set('Content-Type', 'application/json');
   const response = await fetch(`/api${path}`, { ...options, headers });
   if (!response.ok) {
-    let message = `请求失败（${response.status}），请稍后重试。`;
+    let message = `Request failed (${response.status}). Please try again.`;
     try {
       const data = await response.json();
       if (typeof data.detail === 'string') message = data.detail;
@@ -27,7 +27,7 @@ export function useResource<T>(path: string, actor?: string, revision = 0) {
     setError('');
     request<T>(path, actor, { signal: controller.signal })
       .then(value => { if (!controller.signal.aborted) setData(value); })
-      .catch(err => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '无法连接服务，请重试。'); })
+      .catch(err => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Cannot reach the service. Please retry.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [path, actor, revision, attempt]);
@@ -56,13 +56,13 @@ export function formatTime(value: string | null | undefined, timezone: string) {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
 }
 
-export const number = (value: number | undefined) => value === undefined ? '—' : value.toLocaleString('zh-CN');
+export const number = (value: number | undefined) => value === undefined ? '—' : value.toLocaleString('en-AU');
 
 export function reasonText(reason: string) {
   const known: Record<string, string> = {
-    incomplete: '尚未完成课程', not_completed: '尚未完成课程', already_certified: '已签发过证书',
-    already_issued: '已签发过证书', revoked: '证书已撤销，不重复签发', issued: '证书签发成功',
-    'Course not completed': '尚未完成课程', 'Already certified': '已签发过证书',
+    incomplete: 'Course incomplete', not_completed: 'Course incomplete', already_certified: 'Already certified',
+    already_issued: 'Already certified', revoked: 'Previously revoked; ineligible for reissue', issued: 'Certificate issued',
+    'Course not completed': 'Course incomplete', 'Already certified': 'Already certified',
   };
   return known[reason] || reason;
 }
