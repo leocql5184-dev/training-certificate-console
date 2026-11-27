@@ -1,5 +1,5 @@
-第一题：失败的原因是，如果同时运行，那么display删掉之后，旧实例执行可能会遇到不存在的列报错。应该新增一列fullname，写入的时候两列一起写，回填时把历史列复制过来，回填完成后，再把读切换到这个fullname，最后的最后再进行删列
-第二题：a的写入应该是发生在B删除之后的，所以ttl不管是多久都没有用
-应该加上一个版本号，读写时都带上版本号，这样不会拿到就的active
-第三题：每个请求都会在100ms超时的时候反复进行重试，一共有50个单元，50\**100\**（3+1）一次加三次重试，就会是2s的延迟，而且50个工作单元全满，所以不会有任何接口响应
-应该要设定，在B连续失败之后要直接切断，并且，要重新设置每个的调用范围，不能让一个地方调用全部资源，
+**1.** The reason it fails: if both run simultaneously, after `display_name` is deleted, old instances executing queries will hit a column that no longer exists and error out. You should add a new column `full_name` first; when writing, write to both columns together; during backfill, copy the historical data into it; after backfill completes, switch reads over to `full_name`; and only at the very end drop the `display_name` column and stop writing to it.
+
+**2.** A's write actually happens *after* B's delete, so shortening the TTL won't help no matter what value it is. You should add a version number, and carry that version on both reads and writes, so you never read back the stale ACTIVE.
+
+**3.** Every request repeatedly retries on the 100 ms timeout. With 50 work units, 50 × 100 × (3 + 1) — one initial attempt plus three retries — produces a 2 s delay, and all 50 work units become saturated, so no other endpoint can respond. You should cut off B directly after it fails consecutively, and re-scope each call so that one place can't consume all the resources.
